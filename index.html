@@ -24,8 +24,7 @@
       max-width: 90px;
       max-height: 90px;
       border: 1px solid #333;
-      font-size: 5vw;
-      max-font-size: 22px;
+      font-size: clamp(16px, 5vw, 22px);
       cursor: pointer;
       background-color: #fff;
     }
@@ -34,12 +33,17 @@
     }
     #lineCount, #victoryMessage {
       margin-top: 20px;
-      font-size: 5vw;
-      max-font-size: 22px;
+      font-size: clamp(16px, 5vw, 22px);
       font-weight: bold;
     }
     #victoryMessage {
       color: green;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -48,11 +52,12 @@
   <table id="bingoBoard"></table>
   <div id="lineCount"></div>
   <div id="victoryMessage"></div>
+  <button onclick="resetGame()">Reset</button>
 
   <script>
     const boardSize = 5;
     const board = [];
-    const numbers = Array.from({ length: 25 }, (_, i) => i + 1);
+    let numbers = [];
     const table = document.getElementById("bingoBoard");
     let linesCompleted = 0;
 
@@ -63,32 +68,89 @@
       }
     }
 
-    shuffle(numbers);
+    function saveState() {
+      const state = {
+        numbers,
+        marked: board.map(row => row.map(cell => cell.classList.contains("marked")))
+      };
+      localStorage.setItem("bingoState", JSON.stringify(state));
+    }
 
-    for (let i = 0; i < boardSize; i++) {
-      const row = [];
-      const tr = document.createElement("tr");
-      for (let j = 0; j < boardSize; j++) {
-        const n = numbers[i * boardSize + j];
-        const td = document.createElement("td");
-        td.textContent = n;
-        td.dataset.number = n;
-        td.onclick = () => {
-          if (!td.classList.contains("marked") && linesCompleted < 5) {
-            td.classList.add("marked");
-            linesCompleted = countLines();
-            document.getElementById("lineCount").textContent = `Lines Completed: ${linesCompleted}`;
-            if (linesCompleted >= 5) {
-              document.getElementById("victoryMessage").textContent = "🎉 Bingo! You completed 5 lines! 🎉";
-              disableAll();
+    function loadState() {
+      const saved = localStorage.getItem("bingoState");
+      if (!saved) return false;
+
+      const state = JSON.parse(saved);
+      numbers = state.numbers;
+      const markedMap = state.marked;
+
+      for (let i = 0; i < boardSize; i++) {
+        const tr = document.createElement("tr");
+        const row = [];
+        for (let j = 0; j < boardSize; j++) {
+          const n = numbers[i * boardSize + j];
+          const td = document.createElement("td");
+          td.textContent = n;
+          td.dataset.number = n;
+          if (markedMap[i][j]) td.classList.add("marked");
+          td.onclick = () => {
+            if (!td.classList.contains("marked") && linesCompleted < 5) {
+              td.classList.add("marked");
+              linesCompleted = countLines();
+              document.getElementById("lineCount").textContent = `Lines Completed: ${linesCompleted}`;
+              saveState();
+              if (linesCompleted >= 5) {
+                document.getElementById("victoryMessage").textContent = "🎉 Bingo! You completed 5 lines! 🎉";
+                disableAll();
+              }
             }
-          }
-        };
-        tr.appendChild(td);
-        row.push(td);
+          };
+          tr.appendChild(td);
+          row.push(td);
+        }
+        table.appendChild(tr);
+        board.push(row);
       }
-      table.appendChild(tr);
-      board.push(row);
+
+      linesCompleted = countLines();
+      document.getElementById("lineCount").textContent = `Lines Completed: ${linesCompleted}`;
+      if (linesCompleted >= 5) {
+        document.getElementById("victoryMessage").textContent = "🎉 Bingo! You completed 5 lines! 🎉";
+        disableAll();
+      }
+      return true;
+    }
+
+    function initBoard() {
+      numbers = Array.from({ length: 25 }, (_, i) => i + 1);
+      shuffle(numbers);
+      for (let i = 0; i < boardSize; i++) {
+        const tr = document.createElement("tr");
+        const row = [];
+        for (let j = 0; j < boardSize; j++) {
+          const n = numbers[i * boardSize + j];
+          const td = document.createElement("td");
+          td.textContent = n;
+          td.dataset.number = n;
+          td.onclick = () => {
+            if (!td.classList.contains("marked") && linesCompleted < 5) {
+              td.classList.add("marked");
+              linesCompleted = countLines();
+              document.getElementById("lineCount").textContent = `Lines Completed: ${linesCompleted}`;
+              saveState();
+              if (linesCompleted >= 5) {
+                document.getElementById("victoryMessage").textContent = "🎉 Bingo! You completed 5 lines! 🎉";
+                disableAll();
+              }
+            }
+          };
+          tr.appendChild(td);
+          row.push(td);
+        }
+        table.appendChild(tr);
+        board.push(row);
+      }
+      saveState();
     }
 
     function countLines() {
@@ -114,6 +176,13 @@
         }
       }
     }
+
+    function resetGame() {
+      localStorage.removeItem("bingoState");
+      location.reload();
+    }
+
+    if (!loadState()) initBoard();
   </script>
 </body>
 </html>
